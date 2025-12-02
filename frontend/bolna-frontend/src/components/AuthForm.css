@@ -1,0 +1,7 @@
+.auth-card h2{font-size:28px;margin-bottom:8px}
+.auth-card .subtitle{color:var(--text-muted);margin-bottom:32px;font-size:14px;line-height:1.5}
+.auth-card label{margin-bottom:20px}
+.auth-card input::placeholder{color:rgba(203,213,225,0.5)}
+.auth-card button{padding:12px 24px;font-weight:600;font-size:15px}
+.auth-footer{text-align:center;margin-top:24px;font-size:14px}
+
