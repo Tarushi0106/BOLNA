@@ -8,6 +8,7 @@ export default function Signup(){
   const [error,setError]=useState('')
   const [loading,setLoading]=useState(false)
   const navigate=useNavigate()
+  const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000'
   async function submit(e){
     e.preventDefault()
     setError('')
@@ -21,7 +22,7 @@ export default function Signup(){
     }
     setLoading(true)
     try{
-      const res=await fetch('http://localhost:5000/api/auth/signup',{
+      const res=await fetch(`${API_BASE}/api/auth/signup`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({name,email,password})
@@ -33,6 +34,7 @@ export default function Signup(){
         return
       }
       localStorage.setItem('token',data.token)
+      localStorage.setItem('user', JSON.stringify({ email: email, name: name }))
       navigate('/dashboard')
     }catch(err){
       setError('Network error: unable to reach server')
@@ -61,7 +63,7 @@ export default function Signup(){
           <button disabled={loading} type="submit">{loading? 'Creating account...':'Create Account'}</button>
         </form>
         <div className="auth-footer">
-          Already have an account? <Link to="/login">Sign in</Link>
+          Already have an account? <Link to="/">Sign in</Link>
         </div>
       </div>
     </div>

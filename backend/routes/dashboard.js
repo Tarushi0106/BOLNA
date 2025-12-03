@@ -1,56 +1,29 @@
-const express = require('express')
-const router = express.Router()
-const User = require('../models/User')
-const Calls = require('../models/Calls')
-const authMiddleware = require('../middleware/auth')
+// backend/models/Calls.js
+const mongoose = require('mongoose');
 
-router.get('/profile', authMiddleware, async (req, res) => {
-  try {
-    const user = await User.findById(req.userId).select('-password')
-    if (!user) return res.status(404).json({ message: 'User not found' })
-    res.json(user)
-  } catch (err) {
-    res.status(500).json({ message: 'Error fetching profile' })
-  }
-})
+const callSchema = new mongoose.Schema({
+  Phone: String,
+  Email: String,
+  Name: String,
+  'Best Time to Call': String,
+  Summary: String,
+  'Interested In': String,
+  'enterprise network solutions including Digital Connectivity 50 MM': String,
+  'MIT as a Service': String,
+  'Low latency multi-cloud connectivity': String,
+  'and Data Centres': String
+}, { 
+  strict: false,
+  timestamps: true // This adds createdAt and updatedAt automatically
+});
 
-router.get('/stats', authMiddleware, async (req, res) => {
-  try {
-    const user = await User.findById(req.userId)
-    const totalUsers = await User.countDocuments()
-    const totalCalls = await Calls.countDocuments()
-    const stats = {
-      userId: user._id,
-      userName: user.name,
-      userEmail: user.email,
-      totalUsers: totalUsers,
-      totalCalls: totalCalls,
-      joinedAt: user.createdAt
-    }
-    res.json(stats)
-  } catch (err) {
-    res.status(500).json({ message: 'Error fetching stats' })
-  }
-})
+// Optional: Add virtuals or methods
+callSchema.virtual('formattedPhone').get(function() {
+  return this.Phone ? `+${this.Phone}` : 'Not provided';
+});
 
-router.get('/calls', authMiddleware, async (req, res) => {
-  try {
-    const calls = await Calls.find().limit(50).sort({createdAt: -1})
-    res.json(calls)
-  } catch (err) {
-    res.status(500).json({ message: 'Error fetching calls' })
-  }
-})
+callSchema.methods.getSummaryPreview = function() {
+  return this.Summary ? this.Summary.substring(0, 100) + '...' : 'No summary';
+};
 
-router.put('/profile', authMiddleware, async (req, res) => {
-  try {
-    const { name } = req.body
-    if (!name) return res.status(400).json({ message: 'Name is required' })
-    const user = await User.findByIdAndUpdate(req.userId, { name }, { new: true }).select('-password')
-    res.json(user)
-  } catch (err) {
-    res.status(500).json({ message: 'Error updating profile' })
-  }
-})
-
-module.exports = router
+module.exports = mongoose.model('Calls', callSchema, 'bolnaCalls');

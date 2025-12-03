@@ -1,136 +1,225 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import './Dashboard.css'
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import './Dashboard.css';
 
-export default function Dashboard(){
-  const [profile,setProfile]=useState(null)
-  const [stats,setStats]=useState(null)
-  const [calls,setCalls]=useState([])
-  const [loading,setLoading]=useState(true)
-  const [error,setError]=useState('')
-  const navigate=useNavigate()
+const Dashboard = () => {
+  const [calls, setCalls] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [user, setUser] = useState(null);
+  const navigate = useNavigate();
 
-  useEffect(()=>{
-    const token=localStorage.getItem('token')
-    if(!token){
-      navigate('/login')
-      return
+  const API_URL = 'http://localhost:4000/api';
+
+  useEffect(() => {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      setUser(JSON.parse(userData));
     }
-    fetchData(token)
-  },[navigate])
+    fetchCalls();
+  }, []);
 
-  async function fetchData(token){
-    try{
-      const [profileRes,statsRes,callsRes]=await Promise.all([
-        fetch('http://localhost:5000/api/dashboard/profile',{
-          headers:{'Authorization':`Bearer ${token}`}
-        }),
-        fetch('http://localhost:5000/api/dashboard/stats',{
-          headers:{'Authorization':`Bearer ${token}`}
-        }),
-        fetch('http://localhost:5000/api/dashboard/calls',{
-          headers:{'Authorization':`Bearer ${token}`}
-        })
-      ])
-      const profileData=await profileRes.json()
-      const statsData=await statsRes.json()
-      const callsData=await callsRes.json()
-      if(!profileRes.ok||!statsRes.ok||!callsRes.ok){
-        setError('Failed to load dashboard data')
-        setLoading(false)
-        return
-      }
-      setProfile(profileData)
-      setStats(statsData)
-      setCalls(Array.isArray(callsData) ? callsData : [])
-    }catch(err){
-      setError('Network error')
+  const fetchCalls = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await axios.get(`${API_URL}/calls`);
+      setCalls(response.data);
+      setLoading(false);
+    } catch (err) {
+      setError('Failed to fetch calls data. Make sure backend server is running on port 4000.');
+      console.error('Error fetching calls:', err);
+      setLoading(false);
     }
-    setLoading(false)
-  }
+  };
 
-  function logout(){
-    localStorage.removeItem('token')
-    navigate('/login')
-  }
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/', { replace: true });
+  };
 
-  if(loading) return <div className="dashboard"><p>Loading...</p></div>
-  if(error) return <div className="dashboard"><p style={{color:'var(--error)'}}>{error}</p></div>
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="spinner"></div>
+        <div className="loading">Loading Calls...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="dashboard">
-      <div className="dash-header">
-        <div>
-          <h2>Dashboard</h2>
-          <p className="greeting">Welcome back, {profile?.name}!</p>
-        </div>
-        <button className="logout-btn" onClick={logout}>Logout</button>
-      </div>
-
-      <div className="stats-grid">
-        <div className="stat-card">
-          <h4>Your Name</h4>
-          <p className="stat-value">{profile?.name}</p>
-        </div>
-        <div className="stat-card">
-          <h4>Email</h4>
-          <p className="stat-value" style={{fontSize:'14px'}}>{profile?.email}</p>
-        </div>
-        <div className="stat-card">
-          <h4>Total Users</h4>
-          <p className="stat-value">{stats?.totalUsers}</p>
-        </div>
-        <div className="stat-card">
-          <h4>Total Calls</h4>
-          <p className="stat-value">{stats?.totalCalls}</p>
-        </div>
-      </div>
-
-      <section className="dash-body">
-        <h3>Profile Information</h3>
-        <div className="profile-info">
-          <div className="info-row">
-            <span>User ID:</span>
-            <span>{profile?._id}</span>
+    <div className="dashboard-layout">
+      {/* Top Navigation Bar */}
+      <nav className="navbar">
+        <div className="navbar-container">
+          <div className="navbar-brand">
+            <h2>📞 BolnaCall</h2>
           </div>
-          <div className="info-row">
-            <span>Email:</span>
-            <span>{profile?.email}</span>
+          <div className="navbar-center">
+            <span className="nav-title">Calls Management System</span>
           </div>
-          <div className="info-row">
-            <span>Name:</span>
-            <span>{profile?.name}</span>
-          </div>
-          <div className="info-row">
-            <span>Member Since:</span>
-            <span>{new Date(profile?.createdAt).toLocaleDateString()}</span>
-          </div>
-        </div>
-      </section>
-
-      <section className="dash-body calls-section">
-        <h3>Recent Calls ({calls.length})</h3>
-        {calls.length === 0 ? (
-          <p style={{color:'var(--text-muted)'}}>No calls found</p>
-        ) : (
-          <div className="calls-table">
-            <div className="table-header">
-              <div className="col-phone">Phone</div>
-              <div className="col-name">Name</div>
-              <div className="col-call">Call Status</div>
-              <div className="col-summary">Summary</div>
-            </div>
-            {calls.map((call,idx)=>(
-              <div key={idx} className="table-row">
-                <div className="col-phone">{call.Phone || 'N/A'}</div>
-                <div className="col-name">{call.Name || 'N/A'}</div>
-                <div className="col-call">{call.Call || 'N/A'}</div>
-                <div className="col-summary">{call.Summary ? call.Summary.substring(0,80)+'...' : 'N/A'}</div>
+          <div className="navbar-user">
+            <div className="user-info">
+              <div className="user-avatar">
+                <span>{user?.email?.[0]?.toUpperCase() || 'U'}</span>
               </div>
-            ))}
+              <div className="user-details">
+                <p className="user-name">{user?.email || 'User'}</p>
+              </div>
+            </div>
+            <button className="logout-btn" onClick={handleLogout} title="Logout">
+              🚪
+            </button>
           </div>
-        )}
-      </section>
+        </div>
+      </nav>
+
+  
+      <div className="dashboard-main">
+    
+        <main className="content">
+         
+          <div className="page-header">
+            <div className="header-left">
+              <h1>Dashboard</h1>
+              <p className="header-subtitle">Welcome to your calls management system</p>
+            </div>
+            <button onClick={fetchCalls} className="btn-primary">
+              🔄 Refresh Data
+            </button>
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="error-box">
+              <span className="error-icon">⚠️</span>
+              <p>{error}</p>
+              <button onClick={fetchCalls} className="btn-small">Retry</button>
+            </div>
+          )}
+
+          {/* Stats Section */}
+          <section className="stats-section">
+            <h2 className="section-title">Quick Stats</h2>
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-header">
+                  <div className="stat-icon">📊</div>
+                  <span className="stat-label">Total Calls</span>
+                </div>
+                <div className="stat-value">{calls.length}</div>
+                <div className="stat-footer">All time records</div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-header">
+                  <div className="stat-icon">✅</div>
+                  <span className="stat-label">Status</span>
+                </div>
+                <div className="stat-value" style={{ color: '#10b981' }}>Active</div>
+                <div className="stat-footer">System operational</div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-header">
+                  <div className="stat-icon">📱</div>
+                  <span className="stat-label">With Contact</span>
+                </div>
+                <div className="stat-value">{calls.filter(c => c.Phone && c.Phone !== 'N/A').length}</div>
+                <div className="stat-footer">Phone numbers</div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-header">
+                  <div className="stat-icon">📧</div>
+                  <span className="stat-label">With Email</span>
+                </div>
+                <div className="stat-value">{calls.filter(c => c.Email && c.Email !== 'N/A').length}</div>
+                <div className="stat-footer">Email addresses</div>
+              </div>
+            </div>
+          </section>
+
+          {/* Calls Table Section */}
+          <section className="table-section">
+            <div className="section-header">
+              <h2 className="section-title">Recent Calls</h2>
+              <span className="record-count">{calls.length} records</span>
+            </div>
+
+            {calls.length > 0 ? (
+              <div className="table-wrapper">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Name</th>
+                      <th>Phone</th>
+                      <th>Email</th>
+                      <th>Best Time to Call</th>
+                      <th>Summary</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {calls.map((call, index) => (
+                      <tr key={index}>
+                        <td className="index-cell">{index + 1}</td>
+                        <td className="name-cell">
+                          <strong>{call.Name || 'N/A'}</strong>
+                        </td>
+                        <td>
+                          {call.Phone && call.Phone !== 'N/A' ? (
+                            <a href={`tel:${call.Phone}`} className="action-link phone-link">
+                              {call.Phone}
+                            </a>
+                          ) : (
+                            <span className="na-text">—</span>
+                          )}
+                        </td>
+                        <td>
+                          {call.Email && call.Email !== 'N/A' ? (
+                            <a href={`mailto:${call.Email}`} className="action-link email-link">
+                              {call.Email}
+                            </a>
+                          ) : (
+                            <span className="na-text">—</span>
+                          )}
+                        </td>
+                        <td>
+                          {call.bestTimeToCall && call.bestTimeToCall !== 'N/A' ? (
+                            <span className="badge">{call.bestTimeToCall}</span>
+                          ) : (
+                            <span className="na-text">—</span>
+                          )}
+                        </td>
+                        <td>
+                          {call.Summary && call.Summary !== 'N/A' ? (
+                            <div className="summary-text">
+                              {call.Summary.length > 50 ? `${call.Summary.substring(0, 50)}...` : call.Summary}
+                            </div>
+                          ) : (
+                            <span className="na-text">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="empty-state">
+                <div className="empty-icon">📭</div>
+                <p>No calls found</p>
+                <button onClick={fetchCalls} className="btn-secondary">Try Again</button>
+              </div>
+            )}
+          </section>
+        </main>
+      </div>
     </div>
-  )
-}
+  );
+};
+
+export default Dashboard;

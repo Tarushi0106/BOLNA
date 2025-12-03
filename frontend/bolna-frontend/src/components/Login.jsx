@@ -7,6 +7,7 @@ export default function Login(){
   const [error,setError]=useState('')
   const [loading,setLoading]=useState(false)
   const navigate=useNavigate()
+  const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000'
   async function submit(e){
     e.preventDefault()
     setError('')
@@ -16,7 +17,7 @@ export default function Login(){
     }
     setLoading(true)
     try{
-      const res=await fetch('http://localhost:5000/api/auth/login',{
+      const res=await fetch(`${API_BASE}/api/auth/login`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({email,password})
@@ -28,6 +29,7 @@ export default function Login(){
         return
       }
       localStorage.setItem('token',data.token)
+      localStorage.setItem('user', JSON.stringify({ email: email }))
       navigate('/dashboard')
     }catch(err){
       setError('Network error: unable to reach server')
