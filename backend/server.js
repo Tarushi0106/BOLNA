@@ -3,11 +3,14 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const cron = require('node-cron');
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const { processBolnaCalls } = require('./services/bolnaService');
 
 const mongoUri = process.env.MONGODB_URI;
 if (!mongoUri) {
@@ -26,6 +29,28 @@ const User = require('./models/User');
 
 const callSchema = new mongoose.Schema({}, { strict: false });
 const BolnaCall = mongoose.model('BolnaCall', callSchema, 'bolnaCalls');
+
+let cronJobStatus = 'stopped';
+
+async function runBolnaScraping() {
+  try {
+    const timestamp = new Date().toLocaleString();
+    console.log(`[CRON] ${timestamp} - Starting Bolna scraping...`);
+    const result = await processBolnaCalls();
+    if (result.success) {
+      console.log(`[CRON] ${timestamp} - Completed! Processed: ${result.processed}, Saved: ${result.saved}`);
+    }
+  } catch (error) {
+    console.error(`[CRON] Error: ${error.message}`);
+  }
+}
+
+console.log('Scheduling Bolna scraping for daily execution at 2 AM...');
+const bolnaCronJob = cron.schedule('0 2 * * *', runBolnaScraping, {
+  scheduled: true,
+  timezone: 'Asia/Kolkata'
+});
+cronJobStatus = 'running';
 
 app.get('/health', (req, res) => {
   res.json({ status: 'Server running', port: process.env.PORT || 4000 });
@@ -155,6 +180,60 @@ app.get('/api/calls/:id', async (req, res) => {
   }
 });
 
+app.get('/api/scheduler/status', (req, res) => {
+  res.json({
+    status: cronJobStatus,
+    schedule: 'Daily at 2:00 AM (Asia/Kolkata)',
+    nextRun: 'Scheduled automatically',
+    message: 'Bolna scraping runs automatically every day'
+  });
+});
+
+app.post('/api/scheduler/run-now', async (req, res) => {
+  try {
+    console.log('Manual trigger: Starting Bolna scraping...');
+    const result = await processBolnaCalls();
+    res.json({
+      success: true,
+      message: 'Scraping triggered manually',
+      result: result
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+app.post('/api/scrape-bolna', async (req, res) => {
+  try {
+    console.log('Starting Bolna scraping workflow...');
+    const result = await processBolnaCalls();
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: 'Bolna calls scraped and processed successfully',
+        processed: result.processed,
+        saved: result.saved,
+        errors: result.errors
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Scrape error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 app.use((err, req, res, next) => {
   console.error('Error:', err);
   res.status(500).json({ error: 'Internal server error' });
@@ -162,8 +241,15 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/health`);
-  console.log(`API Calls: http://localhost:${PORT}/api/calls`);
-  console.log(`Raw Data: http://localhost:${PORT}/api/calls/raw`);
+  console.log(`\n=== Server Running on Port ${PORT} ===\n`);
+  console.log('Available Endpoints:');
+  console.log(`  Health check: http://localhost:${PORT}/health`);
+  console.log(`  API Calls: http://localhost:${PORT}/api/calls`);
+  console.log(`  Scrape Bolna: http://localhost:${PORT}/api/scrape-bolna`);
+  console.log(`  Manual Trigger: POST http://localhost:${PORT}/api/scheduler/run-now`);
+  console.log(`  Scheduler Status: http://localhost:${PORT}/api/scheduler/status`);
+  console.log('\n=== Automatic Scheduler ===');
+  console.log('Status: RUNNING');
+  console.log('Schedule: Daily at 2:00 AM (Asia/Kolkata timezone)');
+  console.log('Task: Automatically scrapes Bolna calls and saves to MongoDB\n');
 });
