@@ -120,43 +120,55 @@ app.get('/api/calls/raw', async (req, res) => {
 
 app.get('/api/calls', async (req, res) => {
   try {
-    const calls = await BolnaCall.find({});
+    const calls = await BolnaCall.find({}).sort({ createdAt: -1 });
     
     const parsedCalls = calls.map(call => {
       const callObj = call.toObject ? call.toObject() : call;
-      const keys = Object.keys(callObj);
       
-      const dataKey = keys.find(key => typeof callObj[key] === 'string' && callObj[key]?.includes('\n'));
-      
-      if (dataKey) {
-        const dataStr = callObj[dataKey];
-        const parsed = {};
+      // Function to convert ISO timestamp to human readable format
+      const formatCallbackTime = (timeStr) => {
+        if (!timeStr || timeStr === 'N/A' || timeStr === 'Not provided') return timeStr;
         
-        const lines = dataStr.split('\n').filter(line => line.trim());
-        lines.forEach(line => {
-          const [key, value] = line.split(':').map(s => s.trim());
-          if (key && value) {
-            parsed[key] = value;
+        // If it's already human readable (doesn't look like a timestamp), return as-is
+        if (!/^\d{4}-\d{2}-\d{2}T/.test(String(timeStr))) return timeStr;
+        
+        try {
+          const date = new Date(timeStr);
+          if (isNaN(date.getTime())) return timeStr;
+          
+          // Just return the time in 12-hour format like "6 PM" or "7 PM"
+          let hours = date.getHours();
+          const minutes = date.getMinutes();
+          const ampm = hours >= 12 ? 'PM' : 'AM';
+          hours = hours % 12;
+          hours = hours ? hours : 12; // 0 should be 12
+          
+          // Include minutes if not on the hour
+          if (minutes !== 0) {
+            return `${hours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
           }
-        });
-        
-        return {
-          _id: call._id,
-          Name: parsed.Name || callObj.Name || callObj.name || 'N/A',
-          Email: parsed.Email || callObj.Email || callObj.email || 'N/A',
-          Phone: parsed.Phone || callObj.Phone || callObj.phone || callObj.phone_number || 'N/A',
-          bestTimeToCall: parsed['Best Time to Call'] || callObj['Best Time to Call'] || callObj['Best_time_to_call'] || callObj.best_time_to_call || callObj.bestTimeToCall || 'N/A',
-          Summary: parsed.Summary || callObj.Summary || callObj.summary || 'N/A'
-        };
-      }
+          return `${hours} ${ampm}`;
+        } catch {
+          return timeStr;
+        }
+      };
       
+      // Get callback time from multiple field variations
+      let callbackTime = callObj.best_time_to_call || callObj['Best Time to Call'] || callObj.bestTimeToCall || callObj['Best_time_to_call'] || 'N/A';
+      callbackTime = formatCallbackTime(callbackTime);
+      
+      // Return clean object with all available fields
       return {
-        _id: call._id,
+        _id: callObj._id,
         Name: callObj.Name || callObj.name || 'N/A',
         Email: callObj.Email || callObj.email || 'N/A',
         Phone: callObj.Phone || callObj.phone || callObj.phone_number || 'N/A',
-        bestTimeToCall: callObj['Best Time to Call'] || callObj['Best_time_to_call'] || callObj.best_time_to_call || callObj.bestTimeToCall || 'N/A',
-        Summary: callObj.Summary || callObj.summary || 'N/A'
+        best_time_to_call: callbackTime,
+        Summary: callObj.Summary || callObj.summary || 'N/A',
+        whatsapp_status: callObj.whatsapp_status || 'not_sent',
+        whatsapp_sent_at: callObj.whatsapp_sent_at,
+        whatsapp_error: callObj.whatsapp_error,
+        createdAt: callObj.createdAt
       };
     });
     

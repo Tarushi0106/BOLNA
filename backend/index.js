@@ -171,7 +171,10 @@ app.get('/api/calls', async (req, res) => {
               Name: '',
               'Best Time to Call': '',
               Summary: '',
-              'Enterprise Network': ''
+              'Enterprise Network': '',
+              whatsapp_status: doc.whatsapp_status || 'not_sent',
+              whatsapp_sent_at: doc.whatsapp_sent_at || null,
+              whatsapp_error: doc.whatsapp_error || null
             };
             
             // Check ALL fields and map them
@@ -196,8 +199,8 @@ app.get('/api/calls', async (req, res) => {
                 cleanDoc.Name = value;
               }
               
-              // Time mapping
-              if (lowerKey.includes('time') || lowerKey.includes('best') || lowerKey.includes('call') || lowerKey.includes('schedule')) {
+              // Time mapping - ONLY for best_time_to_call field, NOT call_timestamp
+              if (lowerKey === 'best_time_to_call' || lowerKey === 'besttimetocall' || key === 'Best Time to Call') {
                 cleanDoc['Best Time to Call'] = value;
               }
               

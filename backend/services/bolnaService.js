@@ -18,9 +18,9 @@ const BOLNA_API_URL = 'https://api.bolna.ai/agent/' + BOLNA_AGENT_ID + '/executi
 
 console.log('Environment Variables Loaded:');
 console.log('BOLNA_AGENT_ID:', BOLNA_AGENT_ID);
-console.log('BOLNA_API_KEY:', BOLNA_API_KEY ?  'Set' : 'Not Set');
-console. log('GROQ_API_KEY:', GROQ_API_KEY ? 'Set' : 'Not Set');
-console.log('MONGODB_URI:', MONGODB_URI ?  'Set' : 'Not Set');
+console.log('BOLNA_API_KEY:', BOLNA_API_KEY ? 'Set' : 'Not Set');
+console.log('GROQ_API_KEY:', GROQ_API_KEY ? 'Set' : 'Not Set');
+console.log('MONGODB_URI:', MONGODB_URI ? 'Set' : 'Not Set');
 console.log('');
 
 let groq;
@@ -40,7 +40,7 @@ async function connectDB() {
     await mongoose.connect(MONGODB_URI);
     console.log('Connected to MongoDB');
   } catch (error) {
-    console. error('MongoDB connection error:', error. message);
+    console.error('MongoDB connection error:', error.message);
     throw error;
   }
 }
@@ -49,7 +49,7 @@ function getBolnaCallModel() {
   try {
     return mongoose.model('BolnaCall');
   } catch {
-    const callSchema = new mongoose. Schema({
+    const callSchema = new mongoose.Schema({
       name: String,
       email: String,
       phone_number: String,
@@ -59,6 +59,10 @@ function getBolnaCallModel() {
       call_duration: Number,
       call_timestamp: Date,
       user_number: String,
+      whatsapp_status: { type: String, default: 'not_sent', enum: ['not_sent', 'pending', 'sent', 'failed'] },
+      whatsapp_message_id: String,
+      whatsapp_sent_at: Date,
+      whatsapp_error: String,
       createdAt: { type: Date, default: Date.now },
       source: { type: String, default: 'bolna-ai' }
     });
@@ -91,7 +95,7 @@ async function extractDataWithGroq(transcript, userNumber) {
     const groqInstance = initGroq();
     
     // Skip if transcript is empty or too short
-    if (!transcript || transcript. length < 50) {
+    if (!transcript || transcript.length < 50) {
       console.log('Transcript too short, skipping extraction');
       return {
         name: 'Not provided',
@@ -102,7 +106,7 @@ async function extractDataWithGroq(transcript, userNumber) {
       };
     }
 
-    const chatCompletion = await groqInstance.chat. completions.create({
+    const chatCompletion = await groqInstance.chat.completions.create({
       messages: [
         {
           role: 'system',
@@ -115,7 +119,7 @@ async function extractDataWithGroq(transcript, userNumber) {
 1. name: The caller's name (NOT "Sia" who is the assistant)
 2. email: Any email address mentioned
 3. phone_number: Caller's phone number (10 digits)
-4. best_time_to_call: When they want to be called back
+4. best_time_to_call: When they want to be called back - MUST be in human-readable format like "tomorrow at 9 AM", "today at 5 PM", "next Monday at 10 AM", etc. NOT timestamps or ISO dates.
 5. summary: Brief 2-3 sentence summary of the call
 
 TRANSCRIPT:
@@ -169,21 +173,22 @@ Return ONLY this JSON format, nothing else:
 
 async function saveToDB(extractedData, originalCall) {
   try {
-    console. log('Saving to MongoDB...');
+    console.log('Saving to MongoDB...');
     const BolnaCall = getBolnaCallModel();
     
     const callData = {
-      name: extractedData. name || 'Not provided',
+      name: extractedData.name || 'Not provided',
       email: extractedData.email || 'Not provided',
-      phone_number: extractedData. phone_number || originalCall.user_number || 'Not provided',
+      phone_number: extractedData.phone_number || originalCall.user_number || 'Not provided',
       best_time_to_call: extractedData.best_time_to_call || 'Not provided',
-      summary: extractedData. summary || 'Not provided',
+      summary: extractedData.summary || 'Not provided',
       transcript: originalCall.transcript || '',
       call_duration: originalCall.conversation_duration || 0,
-      call_timestamp: originalCall. created_at || new Date(),
+      call_timestamp: originalCall.created_at || new Date(),
       user_number: originalCall.user_number || '',
       createdAt: new Date(),
-      source: 'bolna-ai'
+      source: 'bolna-ai',
+      whatsapp_status: 'pending'
     };
     
     const result = await BolnaCall.create(callData);

@@ -159,6 +159,7 @@ const Dashboard = () => {
                       <th>Phone</th>
                       <th>Email</th>
                       <th>Best Time to Call</th>
+                      <th>WhatsApp Status</th>
                       <th>Summary</th>
                     </tr>
                   </thead>
@@ -188,10 +189,22 @@ const Dashboard = () => {
                           )}
                         </td>
                         <td>
-                          {call.bestTimeToCall && call.bestTimeToCall !== 'N/A' ? (
-                            <span className="badge">{call.bestTimeToCall}</span>
+                          {(call.best_time_to_call || call.bestTimeToCall || call['Best Time to Call'] || call['best_time_to_call']) && 
+                           (call.best_time_to_call || call.bestTimeToCall || call['Best Time to Call'] || call['best_time_to_call']) !== 'N/A' ? (
+                            <span className="badge">{call.best_time_to_call || call.bestTimeToCall || call['Best Time to Call'] || call['best_time_to_call']}</span>
                           ) : (
                             <span className="na-text">—</span>
+                          )}
+                        </td>
+                        <td>
+                          {call.whatsapp_status === 'sent' ? (
+                            <span className="status-badge status-sent">✅ Sent</span>
+                          ) : call.whatsapp_status === 'failed' ? (
+                            <span className="status-badge status-failed">❌ Failed</span>
+                          ) : call.whatsapp_status === 'pending' ? (
+                            <span className="status-badge status-pending">⏳ Pending</span>
+                          ) : (
+                            <span className="status-badge status-unsent">⭕ Not Sent</span>
                           )}
                         </td>
                         <td>
