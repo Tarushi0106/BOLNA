@@ -193,10 +193,51 @@ async function saveToDB(extractedData, originalCall) {
     
     const result = await BolnaCall.create(callData);
     console.log('Saved call record: ' + result._id);
+    
+    // Automatically send WhatsApp message after saving
+    await sendWhatsAppAfterSave(result);
+    
     return result;
   } catch (error) {
     console.error('Error saving to MongoDB:', error.message);
     throw error;
+  }
+}
+
+async function sendWhatsAppAfterSave(callRecord) {
+  try {
+    const { sendWhatsAppMessage } = require('./whatsappHelper');
+    
+    // Only send if we have a valid phone number
+    const phone = callRecord.phone_number;
+    if (!phone || phone === 'Not provided' || phone.length < 10) {
+      console.log('⏭️  Skipping WhatsApp - invalid phone number');
+      return;
+    }
+    
+    // Send WhatsApp message
+    const name = callRecord.name || 'Customer';
+    const result = await sendWhatsAppMessage(phone, name);
+    
+    // Update status in database
+    const BolnaCall = getBolnaCallModel();
+    if (result.success) {
+      await BolnaCall.findByIdAndUpdate(callRecord._id, {
+        whatsapp_status: 'sent',
+        whatsapp_sent_at: new Date(),
+        whatsapp_message_id: result.data?.message_id || null
+      });
+      console.log('✅ WhatsApp status updated to: sent');
+    } else {
+      await BolnaCall.findByIdAndUpdate(callRecord._id, {
+        whatsapp_status: 'failed',
+        whatsapp_error: JSON.stringify(result.error)
+      });
+      console.log('❌ WhatsApp status updated to: failed');
+    }
+  } catch (error) {
+    console.error('Error sending WhatsApp:', error.message);
+    // Don't throw - we don't want to fail the entire process if WhatsApp fails
   }
 }
 
