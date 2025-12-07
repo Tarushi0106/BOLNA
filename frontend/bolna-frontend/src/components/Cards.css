@@ -1,0 +1,100 @@
+/* src/components/Card.css - For enhanced stat cards */
+.stat-card.document-count {
+    border-top-color: #667eea;
+}
+
+.stat-card.document-count .stat-number {
+    color: #667eea;
+}
+
+.stat-card.document-count .stat-icon {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+}
+
+.stat-card.storage-size {
+    border-top-color: #f39c12;
+}
+
+.stat-card.storage-size .stat-number {
+    color: #f39c12;
+}
+
+.stat-card.storage-size .stat-icon {
+    background: linear-gradient(135deg, #f39c12, #e67e22);
+}
+
+.stat-card.collection-count {
+    border-top-color: #e74c3c;
+}
+
+.stat-card.collection-count .stat-number {
+    color: #e74c3c;
+}
+
+.stat-card.collection-count .stat-icon {
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+}
+
+/* Badge styles for document status */
+.status-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge-active {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.badge-pending {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.badge-error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* Action buttons in table */
+.action-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.table-btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+}
+
+.table-btn.view {
+    background-color: #e3f2fd;
+    color: #1976d2;
+}
+
+.table-btn.edit {
+    background-color: #fff8e1;
+    color: #ff8f00;
+}
+
+.table-btn.delete {
+    background-color: #ffebee;
+    color: #d32f2f;
+}
+
+.table-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}

@@ -1,0 +1,25 @@
+:root {
+  --bg-darker: #020617;
+  --bg-card: #1e293b;
+  --text: #f1f5f9;
+  --text-muted: #cbd5e1;
+  --primary: #3b82f6;
+  --primary-dark: #1d4ed8;
+  --border: #334155;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  background-color: var(--bg-darker);
+  color: var(--text);
+}
+
+#root {
+  min-height: 100vh;
+}
