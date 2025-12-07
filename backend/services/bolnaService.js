@@ -168,54 +168,44 @@ ${transcript}
 
 /* -------------------- SAVE TO DB -------------------- */
 
-/**
- * saveToDB - more tolerant mapping for whatsapp fields:
- * - Bolna API may return whatsapp fields nested (e.g. call.whatsapp.messageId or call.whatsapp.message_id)
- * - This function attempts multiple keys and falls back to sensible defaults.
- */
 async function saveToDB(extractedData, call) {
   const BolnaCall = getBolnaCallModel();
 
-  // Normalize user_number (strip country prefix if present)
-  const normalizedUserNumber = call.user_number ? call.user_number.replace(/^\+?91/, '') : null;
-
-  // Try multiple possible shapes for whatsapp fields
-  const whatsappMessageId =
-    call.whatsapp_message_id ||
-    (call.whatsapp && (call.whatsapp.message_id || call.whatsapp.messageId)) ||
-    null;
-
-  const whatsappSentAt =
-    call.whatsapp_sent_at ||
-    (call.whatsapp && (call.whatsapp.sent_at || call.whatsapp.sentAt)) ||
-    call.whatsapp_sent_at || // keep original fallback
-    null;
-
-  const whatsappError =
-    call.whatsapp_error ||
-    (call.whatsapp && (call.whatsapp.error || (call.whatsapp.error && call.whatsapp.error.message))) ||
-    null;
-
-  // Prefer explicit top-level status, else look into possible nested field, else keep schema default ('pending')
-  const whatsappStatus = (typeof call.whatsapp_status !== 'undefined' && call.whatsapp_status !== null)
-    ? call.whatsapp_status
-    : (call.whatsapp && call.whatsapp.status) ? call.whatsapp.status : 'pending';
+  const normalizedUserNumber = call.user_number
+    ? String(call.user_number).replace(/^\+?91/, '')
+    : null;
 
   return await BolnaCall.create({
+    bolna_call_id: call.id || null, // ✅ STORE THIS
     name: extractedData.name,
     email: extractedData.email,
     phone_number: extractedData.phone_number,
     best_time_to_call: extractedData.best_time_to_call,
     summary: extractedData.summary,
-    transcript: call.transcript || '',
+    transcript:
+      call.transcript ||
+      call.output?.transcript ||
+      '',
     call_duration: call.conversation_duration || 0,
-    call_timestamp: call.created_at ? new Date(call.created_at) : new Date(),
+    call_timestamp: call.created_at
+      ? new Date(call.created_at)
+      : new Date(),
     user_number: normalizedUserNumber,
     source: 'bolna-ai',
-    whatsapp_status: whatsappStatus,
-    whatsapp_message_id: whatsappMessageId,
-    whatsapp_sent_at: whatsappSentAt ? new Date(whatsappSentAt) : null,
-    whatsapp_error: whatsappError
+    whatsapp_status:
+      call.whatsapp_status ||
+      call.whatsapp?.status ||
+      'pending',
+    whatsapp_message_id:
+      call.whatsapp_message_id ||
+      call.whatsapp?.messageId ||
+      null,
+    whatsapp_sent_at:
+      call.whatsapp_sent_at
+        ? new Date(call.whatsapp_sent_at)
+        : null,
+    whatsapp_error:
+      call.whatsapp_error || null
   });
 }
 
@@ -226,72 +216,72 @@ async function processBolnaCalls() {
   await connectDB();
 
   const calls = await fetchBolnaCalls();
-
-  if (!calls || calls.length === 0) {
-    console.log('⚠️ No calls found from Bolna API');
+  if (!Array.isArray(calls) || calls.length === 0) {
+    console.log('⚠️ No calls from Bolna');
     await mongoose.connection.close();
-    return { new_calls: 0, duplicate_calls: 0, total_from_api: 0 };
+    return;
   }
 
-  console.log(`📞 Fetched ${calls.length} calls from Bolna API`);
+  console.log(`📞 Bolna returned ${calls.length} calls`);
+
+  const BolnaCall = getBolnaCallModel();
 
   let newCount = 0;
   let duplicateCount = 0;
-  const BolnaCall = getBolnaCallModel();
 
   for (const call of calls) {
     try {
-      // Use bolna call ID or user_number + timestamp as unique identifier
-      const callId = call.id || `${call.user_number}_${call.created_at}`;
-      
-      const existingCall = await BolnaCall.findOne({
+      const bolnaId = call.id || null;
+
+      const phone = call.user_number
+        ? String(call.user_number).replace(/^\+91/, '')
+        : null;
+
+      const timestamp = call.created_at
+        ? new Date(call.created_at)
+        : null;
+
+      // ✅ STRONG DUPLICATE CHECK
+      const exists = await BolnaCall.findOne({
         $or: [
-          { bolna_call_id: callId },
-          { phone_number: call.user_number ? String(call.user_number).replace(/^\+91/, '') : null, call_timestamp: call.created_at ? new Date(call.created_at) : null }
+          bolnaId ? { bolna_call_id: bolnaId } : {},
+          phone && timestamp
+            ? { phone_number: phone, call_timestamp: timestamp }
+            : {}
         ]
       });
 
-      if (existingCall) {
-        console.log(`⏭️ Duplicate: ${call.user_number}`);
+      if (exists) {
         duplicateCount++;
         continue;
       }
 
-      const transcript = call.transcript
-        || (call.transcripts && Array.isArray(call.transcripts) && (call.transcripts[0] && (call.transcripts[0].text || call.transcripts[0].transcript)))
-        || call.output?.transcript
-        || '';
+      const transcript =
+        call.transcript ||
+        call.output?.transcript ||
+        '';
 
-      const userNumber = call.user_number ? String(call.user_number).replace(/^\+91/, '') : null;
-      console.log(`🔄 Processing call - phone: ${userNumber}, transcript length: ${(transcript || '').length}`);
+      const extracted = await extractDataWithGroq(transcript, phone);
 
-      // Extract with AI
-      const extracted = await extractDataWithGroq(transcript || '', userNumber);
-      console.log('✅ AI Extraction:', extracted);
-
-      // Save to DB
       await saveToDB(extracted, call);
       newCount++;
 
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 300));
     } catch (err) {
-      console.error('❌ Error:', err.message);
+      // ✅ Ignore duplicate index errors safely
+      if (err.code === 11000) {
+        duplicateCount++;
+      } else {
+        console.error('❌ Save error:', err.message);
+      }
     }
   }
 
-  console.log('\n========== SYNC SUMMARY ==========');
-  console.log(`✅ New calls saved: ${newCount}`);
-  console.log(`⏭️ Duplicates skipped: ${duplicateCount}`);
-  console.log(`📊 Total from Bolna API: ${calls.length}`);
-  console.log('===================================\n');
+  console.log('✅ SYNC COMPLETE');
+  console.log('New:', newCount);
+  console.log('Duplicates:', duplicateCount);
 
   await mongoose.connection.close();
-  
-  return {
-    new_calls: newCount,
-    duplicate_calls: duplicateCount,
-    total_from_api: calls.length
-  };
 }
 
 /* -------------------- RUN -------------------- */
